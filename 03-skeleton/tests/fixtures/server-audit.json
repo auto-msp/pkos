@@ -1,0 +1,113 @@
+{
+  "schema_version": "1.0",
+  "generated_at_utc": "2026-01-01T00:00:00Z",
+  "generator": "pkos-server-audit.sh (synthetic fixture)",
+  "host": "fixture-host",
+  "ran_as_root": true,
+  "notes": [
+    "synthetic fixture for tests; not a real machine"
+  ],
+  "identity": {
+    "uname": {
+      "lines": [
+        "Linux fixture-host 6.8.0 x86_64"
+      ]
+    },
+    "os_release": {
+      "lines": [
+        "PRETTY_NAME=\"Ubuntu 24.04 LTS\""
+      ]
+    }
+  },
+  "storage": {
+    "df_bytes": {
+      "lines": [
+        "/dev/sda1  ext4  50G  41G  9.0G  82% /"
+      ]
+    },
+    "df_inodes": {
+      "lines": [
+        "/dev/sda1  3.2M  210K  3.0M  7% /"
+      ]
+    },
+    "low_free_filesystems": {
+      "lines": [
+        "/dev/sda1 82% /"
+      ]
+    }
+  },
+  "heatmap": {
+    "top_dirs": {
+      "lines": [
+        "12G\t/var/lib/docker"
+      ]
+    }
+  },
+  "docker": {
+    "status": "present",
+    "ps": {
+      "lines": [
+        "abc123  nginx  Up 3 days"
+      ]
+    }
+  },
+  "archives": {
+    "found": {
+      "lines": []
+    }
+  },
+  "databases": {
+    "listening": {
+      "lines": [
+        "5432 postgres"
+      ]
+    }
+  },
+  "services": {
+    "systemd_failed": {
+      "lines": []
+    }
+  },
+  "scheduled": {
+    "root_crontab": {
+      "lines": [
+        "0 2 * * * /usr/local/bin/backup.sh"
+      ]
+    },
+    "systemd_timers": {
+      "lines": [
+        "logrotate.timer  active"
+      ]
+    }
+  },
+  "age_profile": {
+    "oldest_files": {
+      "lines": [
+        "2019-04-02 /etc/hosts"
+      ]
+    }
+  },
+  "backups": {
+    "targets": {
+      "lines": [
+        "/srv/backups"
+      ]
+    }
+  },
+  "security_surface": {
+    "listening_sockets": {
+      "lines": [
+        "0.0.0.0:22 sshd"
+      ]
+    }
+  },
+  "pkos_probes": {
+    "python3": {
+      "lines": [
+        "Python 3.12.3"
+      ]
+    }
+  },
+  "error_count": 0,
+  "errors": []
+}

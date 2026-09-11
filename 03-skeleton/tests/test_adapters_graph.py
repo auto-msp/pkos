@@ -1,0 +1,246 @@
+"""Obsidian and n8n: the two sources whose value IS their graph.
+
+Both of these can be "successfully" ingested while losing everything that
+matters. A vault ingested as loose files keeps every sentence and drops every
+link the author drew by hand. A workflow ingested as one JSON blob keeps the
+automation as an opaque string and answers no question about what feeds what.
+Neither failure raises. So the tests here assert EDGES, not bytes.
+
+The n8n half additionally asserts what must NOT be in the store. n8n
+parameters routinely hold hard-coded tokens, and the Airtable ingest earlier in
+this project proved the store will swallow a credential nobody looked at and
+report a clean run.
+"""
+import json, shutil, sys, tempfile
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from _harness import Suite, sb, sbj, ingest, q, one            # noqa: E402
+
+
+def make_vault(d):
+    v = d / "vault"; (v / "projects").mkdir(parents=True)
+    (v / "daily").mkdir()
+    (v / ".obsidian").mkdir()
+    (v / ".obsidian" / "workspace.json").write_text("{}", encoding="utf-8")
+
+    (v / "PKOS.md").write_text(
+        "---\n"
+        "title: Personal Knowledge OS\n"
+        "tags:\n"
+        "  - architecture\n"
+        "  - secondbrain\n"
+        "status: active\n"
+        "date: 2026-09-01\n"
+        "---\n"
+        "# PKOS\n\n"
+        "Depends on [[Perceptor]] and links to [[projects/Second Brain|the build]].\n"
+        "Also embeds ![[diagram.png]].\n"
+        "Tagged #architecture and #ops/infra inline.\n\n"
+        "```python\n"
+        "# not a tag: [[NotALink]] and #notatag live in a fence\n"
+        "```\n", encoding="utf-8")
+    (v / "Perceptor.md").write_text(
+        "# Perceptor\n\nThe master. Back to [[PKOS]].\n#ops/infra\n", encoding="utf-8")
+    (v / "projects" / "Second Brain.md").write_text(
+        "# Second Brain\n\nSee [[PKOS]] and [[Ghost Note]] which does not exist.\n",
+        encoding="utf-8")
+    # deliberate name collision: two files called "Ambiguous"
+    (v / "Ambiguous.md").write_text("# A\n[[PKOS]]\n", encoding="utf-8")
+    (v / "projects" / "Ambiguous.md").write_text("# B\n", encoding="utf-8")
+    (v / "Collide.md").write_text("Links to [[Ambiguous]].\n", encoding="utf-8")
+    (v / "daily" / "2026-09-11.md").write_text(
+        "# Today\n\nShipped part 2. [[PKOS]]\n", encoding="utf-8")
+    (v / "diagram.png").write_bytes(b"\x89PNG\r\n\x1a\nfake")
+    (v / "board.canvas").write_text('{"nodes":[],"edges":[]}', encoding="utf-8")
+    return v
+
+
+def make_n8n(d):
+    n = d / "n8n"; n.mkdir(parents=True)
+    wf = {
+        "id": "wf-42", "name": "Lead Router", "active": True,
+        "createdAt": "2026-05-01T10:00:00.000Z",
+        "updatedAt": "2026-08-20T12:00:00.000Z",
+        "tags": [{"name": "outbound"}],
+        "nodes": [
+            {"id": "n1", "name": "Webhook", "type": "n8n-nodes-base.webhook",
+             "typeVersion": 1, "position": [0, 0], "webhookId": "abc",
+             "parameters": {"path": "lead-in", "httpMethod": "POST"}},
+            {"id": "n2", "name": "Enrich", "type": "n8n-nodes-base.httpRequest",
+             "typeVersion": 3, "position": [200, 0],
+             "credentials": {"httpHeaderAuth": {"id": "7", "name": "Clay key"}},
+             "parameters": {
+                 "url": "https://api.clay.com/v1/enrich",
+                 "apiKey": "live_9f8e7d6c5b4a39281706fedcba098765",
+                 "headerParameters": {"parameters": [
+                     {"name": "Authorization",
+                      "value": "Bearer eyJhbGciOiJIUzI1NiJ9.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}]}}},
+            {"id": "n3", "name": "Mautic", "type": "n8n-nodes-base.mautic",
+             "typeVersion": 1, "position": [400, 0],
+             "parameters": {"resource": "contact", "operation": "create"}},
+        ],
+        "connections": {
+            "Webhook": {"main": [[{"node": "Enrich", "type": "main", "index": 0}]]},
+            "Enrich":  {"main": [[{"node": "Mautic", "type": "main", "index": 0}]]},
+        },
+    }
+    (n / "workflows.json").write_text(json.dumps([wf]), encoding="utf-8")
+    return n
+
+
+def main():
+    s = Suite("GRAPH-ADAPTER")
+    tmp = Path(tempfile.mkdtemp(prefix="pkos-graph-"))
+    root = tmp / "store"
+    sb(root, "init")
+    fx = tmp / "fx"; fx.mkdir()
+
+    # ------------------------------------------------------------ Obsidian
+    print("\nOBSIDIAN VAULT")
+    v = make_vault(fx)
+    d, r = ingest(root, "obsidian", v, "--identity", "automsp-vault")
+    s.check("ingest completes", d and d["status"] == "COMPLETED",
+            (r.stdout + r.stderr)[-400:] if not d else "")
+    st = (d or {}).get("adapter_stats", {})
+    s.check("7 notes, 1 canvas, 1 attachment",
+            (st.get("notes"), st.get("canvases"), st.get("attachments")) == (7, 1, 1),
+            "%s" % [st.get("notes"), st.get("canvases"), st.get("attachments")])
+    s.check(".obsidian config directory not ingested as content",
+            one(root, "SELECT COUNT(*) FROM source_object"
+                      " WHERE native_id LIKE '%.obsidian%'") == 0)
+
+    s.check("wikilinks became real edges", st.get("links_resolved", 0) >= 4,
+            "resolved=%s of %s found" % (st.get("links_resolved"),
+                                         st.get("wikilinks_found")))
+    s.check("an attachment embed resolves to the FILE and is typed EMBEDS",
+            one(root, "SELECT COUNT(*) FROM relationship r JOIN object o"
+                      " ON o.object_id=r.target_object"
+                      " WHERE r.relationship_type='EMBEDS'"
+                      " AND o.title='diagram'") == 1,
+            "embeds found=%s" % st.get("embeds"))
+    s.check("a path-qualified link [[folder/Note]] resolves too",
+            one(root, "SELECT COUNT(*) FROM relationship r"
+                      " JOIN object src ON src.object_id=r.source_object"
+                      " JOIN object tgt ON tgt.object_id=r.target_object"
+                      " WHERE src.title='Personal Knowledge OS'"
+                      " AND tgt.title='Second Brain'") == 1)
+    s.check("a link to a note that does not exist is counted, not dropped "
+            "silently", st.get("links_to_missing_notes") == 1,
+            "got %s" % st.get("links_to_missing_notes"))
+    s.check("an ambiguous link is refused rather than guessed",
+            st.get("ambiguous_links") == 1 and st.get("name_collisions") == 1,
+            "ambiguous=%s collisions=%s" % (st.get("ambiguous_links"),
+                                            st.get("name_collisions")))
+
+    meta = json.loads(one(root, "SELECT raw_metadata FROM source_object"
+                                " WHERE native_id='obsidian:PKOS.md'"))
+    s.check("YAML frontmatter parsed into real fields",
+            meta["frontmatter"].get("status") == "active"
+            and "architecture" in (meta["frontmatter"].get("tags") or []),
+            "fm=%s" % meta["frontmatter"])
+    s.check("frontmatter title wins over the filename",
+            one(root, "SELECT COUNT(*) FROM object"
+                      " WHERE title='Personal Knowledge OS'") == 1)
+    s.check("inline and frontmatter tags merged",
+            set(meta["tags"]) >= {"architecture", "ops/infra", "secondbrain"},
+            "tags=%s" % meta["tags"])
+    s.check("a link inside a code fence is NOT a link",
+            "NotALink" not in meta["wikilinks"], "links=%s" % meta["wikilinks"])
+    s.check("a #hash inside a code fence is NOT a tag",
+            "notatag" not in meta["tags"], "tags=%s" % meta["tags"])
+
+    daily = json.loads(one(root, "SELECT raw_metadata FROM source_object"
+                                 " WHERE native_id='obsidian:daily/2026-09-11.md'"))
+    s.check("a daily note is dated from its filename",
+            daily["is_daily_note"] and (one(
+                root, "SELECT source_created_at FROM source_object"
+                      " WHERE native_id='obsidian:daily/2026-09-11.md'") or ""
+                ).startswith("2026-09-11"))
+
+    d2, _ = ingest(root, "obsidian", v, "--identity", "automsp-vault")
+    s.check("re-ingest of an unchanged vault creates nothing",
+            (d2 or {}).get("created") == 0 and (d2 or {}).get("unchanged", 0) > 0,
+            "created=%s" % (d2 or {}).get("created"))
+
+    # ---------------------------------------------------------------- n8n
+    print("\nN8N WORKFLOWS")
+    n = make_n8n(fx)
+    d, r = ingest(root, "n8n", n, "--identity", "n8n.automsp.us")
+    s.check("ingest completes", d and d["status"] == "COMPLETED",
+            (r.stdout + r.stderr)[-400:] if not d else "")
+    st = (d or {}).get("adapter_stats", {})
+    s.check("1 workflow, 3 nodes", st.get("workflows") == 1 and st.get("nodes") == 3,
+            "%s / %s" % (st.get("workflows"), st.get("nodes")))
+    s.check("the wiring became FLOWS_TO edges, not a JSON string",
+            st.get("flow_edges_written") == 2,
+            "got %s" % st.get("flow_edges_written"))
+    s.check("nodes are PART_OF their workflow",
+            one(root, "SELECT COUNT(*) FROM relationship r JOIN object o"
+                      " ON o.object_id=r.target_object"
+                      " WHERE r.relationship_type='PART_OF'"
+                      " AND o.object_class='Workflow'") == 3)
+
+    print("\n  the part that matters: no credential reaches the store")
+    leaked = one(root, "SELECT COUNT(*) FROM object_version"
+                       " WHERE body LIKE '%live_9f8e7d6c%'"
+                       "    OR body LIKE '%eyJhbGciOiJIUzI1NiJ9%'")
+    s.check("the hard-coded API key and bearer token are NOT in any body",
+            leaked == 0, "leaked=%s" % leaked)
+    s.check("redaction happened by key name and by pattern",
+            st.get("parameters_redacted_by_key", 0) >= 1
+            and st.get("parameters_redacted_by_pattern", 0) >= 1,
+            "by_key=%s by_pattern=%s" % (st.get("parameters_redacted_by_key"),
+                                         st.get("parameters_redacted_by_pattern")))
+    s.check("what was redacted is recorded by KEY, never by value",
+            "apiKey" in (st.get("redacted_keys") or []),
+            "keys=%s" % st.get("redacted_keys"))
+    s.check("the credential REFERENCE is kept (it is not a secret)",
+            st.get("credential_refs") == 1
+            and "Clay key" in (one(root, "SELECT raw_metadata FROM source_object"
+                                         " WHERE native_id LIKE '%node:wf-42:Enrich'") or ""))
+    s.check("useful non-secret parameters survive redaction",
+            "lead-in" in (one(root, "SELECT v.body FROM object o JOIN object_version v"
+                                    " ON o.current_version=v.version_id"
+                                    " WHERE o.title LIKE 'Webhook%'") or ""))
+
+    print("\n  a credentials export is refused outright")
+    bad = fx / "n8n-creds"; bad.mkdir()
+    (bad / "credentials.json").write_text(json.dumps(
+        [{"id": "7", "name": "Clay key", "type": "httpHeaderAuth",
+          "encryptedData": "U2FsdGVkX1+abcdef=="}]), encoding="utf-8")
+    rc = sb(root, "ingest", "n8n", str(bad), "--identity", "n8n.automsp.us")
+    blob = (rc.stdout + rc.stderr).lower()
+    s.check("credentials file refused with the reason named",
+            rc.returncode != 0 and "credential" in blob and "evidence plane" in blob,
+            "exit=%d" % rc.returncode)
+    s.check("and nothing from it was written",
+            one(root, "SELECT COUNT(*) FROM evidence_blob"
+                      " WHERE original_filename='credentials.json'") == 0)
+
+    # -------------------------------------------------------- invariants
+    print("\nINVARIANTS")
+    v2, _ = sbj(root, "validate")
+    s.check("validate passes", v2 and v2["status"] == "PASSED",
+            "failed=%s" % (v2 or {}).get("failed_checks"))
+    sc, _ = sbj(root, "secrets")
+    s.check("the secret scanner finds nothing left to redact",
+            sc is not None and sc.get("objects_with_credentials", 0) == 0,
+            "found=%s" % (sc or {}).get("objects_with_credentials"))
+
+    rc2 = sb(root, "rebuild-index", "--quiet")
+    s.check("index rebuilds", rc2.returncode == 0)
+    sr, _ = sbj(root, "search", "Perceptor")
+    s.check("vault content is searchable", sr and len(sr.get("results", [])) >= 1,
+            "hits=%s" % (len(sr.get("results", [])) if sr else "n/a"))
+
+    rc3 = s.finish()
+    if rc3 == 0:
+        shutil.rmtree(tmp, ignore_errors=True)
+    else:
+        print("store kept: %s" % root)
+    return rc3
+
+
+if __name__ == "__main__":
+    sys.exit(main())

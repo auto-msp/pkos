@@ -1,0 +1,222 @@
+{
+ "candidates": [
+  {
+   "path": "HTML Files/Bookmarks - 12th Aug 2026.html",
+   "bytes": 1518701,
+   "mtime_utc": "2026-08-12T04:51:11Z",
+   "format": "Netscape bookmark HTML",
+   "url_occurrences": 1654,
+   "unique_urls": 1466,
+   "unique_domains": 1112,
+   "folder_nodes_H3": 182,
+   "add_date_tags": 1847,
+   "earliest_add_date": "2018-07-02",
+   "latest_add_date": "2026-08-12",
+   "span_years": 8.1,
+   "schema": [
+    "HREF",
+    "ADD_DATE",
+    "LAST_MODIFIED",
+    "ICON",
+    "anchor text (title)",
+    "H3 folder hierarchy"
+   ]
+  },
+  {
+   "path": "HTML Files/bookmarks_organized (1).html",
+   "bytes": 223012,
+   "mtime_utc": "2026-08-12T08:29:59Z",
+   "format": "Netscape bookmark HTML",
+   "url_occurrences": 1466,
+   "unique_urls": 1466,
+   "unique_domains": 1112,
+   "folder_nodes_H3": 143,
+   "add_date_tags": 0,
+   "schema": [
+    "HREF",
+    "ADD_DATE",
+    "LAST_MODIFIED",
+    "ICON",
+    "anchor text (title)",
+    "H3 folder hierarchy"
+   ]
+  },
+  {
+   "path": "HTML Files/bookmarks_organized (2).html",
+   "bytes": 214304,
+   "mtime_utc": "2026-08-12T08:32:42Z",
+   "format": "Netscape bookmark HTML",
+   "url_occurrences": 1411,
+   "unique_urls": 1411,
+   "unique_domains": 1090,
+   "folder_nodes_H3": 143,
+   "add_date_tags": 0,
+   "schema": [
+    "HREF",
+    "ADD_DATE",
+    "LAST_MODIFIED",
+    "ICON",
+    "anchor text (title)",
+    "H3 folder hierarchy"
+   ]
+  },
+  {
+   "path": "HTML Files/bookmarks_organized.html",
+   "bytes": 11322,
+   "mtime_utc": "2026-08-12T05:18:57Z",
+   "format": "Netscape bookmark HTML",
+   "url_occurrences": 66,
+   "unique_urls": 66,
+   "unique_domains": 64,
+   "folder_nodes_H3": 22,
+   "add_date_tags": 2,
+   "earliest_add_date": "2024-01-08",
+   "latest_add_date": "2025-10-09",
+   "span_years": 1.8,
+   "schema": [
+    "HREF",
+    "ADD_DATE",
+    "LAST_MODIFIED",
+    "ICON",
+    "anchor text (title)",
+    "H3 folder hierarchy"
+   ]
+  },
+  {
+   "path": "02 - Code Projects/HTML Files/Latest Bookmarks From Company New Laptop.html",
+   "bytes": 419373,
+   "mtime_utc": "2025-12-07T08:54:39Z",
+   "format": "Netscape bookmark HTML",
+   "url_occurrences": 492,
+   "unique_urls": 309,
+   "unique_domains": 223,
+   "folder_nodes_H3": 36,
+   "add_date_tags": 533,
+   "earliest_add_date": "2018-07-02",
+   "latest_add_date": "2022-07-05",
+   "span_years": 4.0,
+   "schema": [
+    "HREF",
+    "ADD_DATE",
+    "LAST_MODIFIED",
+    "ICON",
+    "anchor text (title)",
+    "H3 folder hierarchy"
+   ]
+  },
+  {
+   "path": "09 - Social & Comms/instagram-Export/logged_information/link_history/link_history.html",
+   "bytes": 61218,
+   "mtime_utc": "2026-04-29T07:37:42Z",
+   "format": "HTML export",
+   "url_occurrences": 0,
+   "unique_urls": 0,
+   "unique_domains": 0,
+   "folder_nodes_H3": 0,
+   "add_date_tags": 0,
+   "schema": [
+    "href",
+    "anchor text"
+   ]
+  },
+  {
+   "path": "Text Files/unique_notion_urls.txt",
+   "bytes": 11425,
+   "mtime_utc": "2026-07-23T09:11:41Z",
+   "format": "plain text URL list",
+   "url_occurrences": 149,
+   "unique_urls": 149,
+   "unique_domains": 4,
+   "folder_nodes_H3": 0,
+   "add_date_tags": 0,
+   "schema": [
+    "one URL per line"
+   ]
+  }
+ ],
+ "union_bookmark_unique_urls": 1614,
+ "union_all_candidate_unique_urls": 1763,
+ "union_unique_domains": 1115,
+ "verdict": "NOT FOUND",
+ "verdict_detail": "No file containing ~20,000 historical URLs exists anywhere in the mounted Downloads folder. The largest URL corpus present is the union of 5 Netscape bookmark HTML exports plus 1 plain-text URL list: 1,763 unique URLs across 1,115 unique domains. The richest single file is 'HTML Files/Bookmarks - 12th Aug 2026.html' with 1,466 unique URLs and 1,847 ADD_DATE timestamps spanning 2018-07-02 to 2026-08-12 (8.1 years). No browser History/places.sqlite database is present.",
+ "shortfall_vs_user_claim": {
+  "user_claimed_urls": 20000,
+  "measured_unique_urls": 1763,
+  "pct_of_claim": 8.8,
+  "user_claimed_span_years": 11,
+  "measured_span_years": 8.1
+ },
+ "searched_and_not_found": [
+  "Browser history SQLite (Chrome/Edge 'History', Firefox 'places.sqlite') - 0 found in Downloads",
+  "*.sqlite/*.db files - 6 found, all application databases (n8n nodes.db 62.6MB, OpenClaw gravity-claw.db), none browser history",
+  "Any CSV/JSON/TXT with >2,000 URL rows - largest URL-bearing dataset is a 1.39M-row Instagram scraper export (0.csv) whose 'website' column is lead data, not browsing history",
+  "Readwise / Pocket / Raindrop / Omnivore / OneTab / Session Buddy exports - 0 found"
+ ],
+ "non_history_urlbearing_datasets_examined": [
+  {
+   "path": "07 - Data & Exports/Excel files/0.csv",
+   "bytes": 114833937,
+   "rows": 1393753,
+   "schema": [
+    "username",
+    "name",
+    "bio",
+    "category",
+    "followerCount",
+    "followingCount",
+    "website",
+    "email",
+    "phone"
+   ],
+   "assessment": "Instagram profile scraper export. Contains a 'website' column but is lead/contact data, NOT browsing history."
+  },
+  {
+   "path": "07 - Data & Exports/apollo-contacts-export.csv",
+   "bytes": 11120828,
+   "rows": 5851,
+   "schema_first_10": [
+    "First Name",
+    "Last Name",
+    "Title",
+    "Company Name",
+    "Company Name for Emails",
+    "Email",
+    "Email Status",
+    "Primary Email Source",
+    "Primary Email Verification Source",
+    "Email Confidence"
+   ],
+   "note": "66-column Apollo.io B2B contact export; includes Person Linkedin Url / Website / Company Linkedin Url columns.",
+   "assessment": "CRM contact export, NOT browsing history."
+  },
+  {
+   "path": "07 - Data & Exports/Excel files/all-contacts.csv",
+   "bytes": 1814057,
+   "rows": 100000,
+   "schema": [
+    "Record ID",
+    "First Name",
+    "Last Name",
+    "Lead Status",
+    "Email",
+    "Phone Number",
+    "Job Title",
+    "Associated Company",
+    "LinkedIn URL",
+    "Associated Company IDs",
+    "Job Function Category",
+    "Likely Region (from phone area code)"
+   ],
+   "assessment": "HubSpot segment export, NOT browsing history."
+  },
+  {
+   "path": "openbot.coreitx.us.kg.har",
+   "bytes": 32412297,
+   "har_entries": 662,
+   "unique_request_urls": 348,
+   "unique_domains": 10,
+   "creator": "WebInspector 537.36",
+   "assessment": "Single-session DevTools network capture, NOT browsing history."
+  }
+ ]
+}

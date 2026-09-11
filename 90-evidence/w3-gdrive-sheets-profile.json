@@ -1,0 +1,69 @@
+{
+  "worker": "W3",
+  "task": "Task C - Sheets as datasets (structural profile, NOT value extraction)",
+  "status": "PARTIAL - emergency persistence pass after session rate-limit interruption",
+  "mandatory_statement": "An AI-generated summary of a Sheet's structure or contents must NEVER become the canonical financial or business record. These profiles describe SHAPE (tabs, columns, formatting cues) to inform a future faithful-canonicalization/ingestion pipeline. They are not, and must not be treated as, a copy of the underlying data.",
+  "canonicalization_gap_found": "read_file_content returns a markdown-table rendering of COMPUTED CELL VALUES ONLY. Formulas are not preserved in that rendering (verified: AutoMSP_Baseline_Capture_Worksheet has a column explicitly documented in-sheet as 'calculated automatically, do not overwrite' which rendered as a plain value/blank with no formula syntax visible). Any ingestion pipeline that needs live formulas, not just point-in-time computed values, cannot rely on read_file_content alone and would need the actual Sheets API (not loaded this wave) or an exported .xlsx.",
+  "selection_method": "At most 5 Sheets were opened via read_file_content, hand-picked as largest / most-recently-modified / most business-critical by name from the 108-record Sheets sample in w3-gdrive-inventory.json.",
+  "profiles": [
+    {
+      "id": "1H0wDL3ky0_4hZ_ovJj-TB57H0HNzeAYbEf-23jhm6T0",
+      "name": "Copy of HubSpot x MATG - Full-Stack AI Marketing Toolkit",
+      "size_bytes": 8158119,
+      "modifiedTime": "2026-08-03T07:54:49.700Z",
+      "selection_reason": "Largest Google Sheet retrieved (8.16MB) in the 108-record sample.",
+      "read_status": "SUCCESS - full read_file_content returned",
+      "structure_observed": "Multi-tab workbook functioning as an AI-prompt library / marketing-toolkit reference, not a numeric ledger. Tabs organize prompts and framework text by marketing function rather than by time period or account. No currency-formatted columns observed; content is predominantly long-form text cells (prompt templates, instructions) rather than numeric data - explains the large byte size despite being a 'toolkit' file.",
+      "canonicalization_needs": "Because this is a text/prompt reference rather than a financial dataset, canonicalization should preserve tab names and cell text verbatim (order matters for prompt sequences); no currency/date normalization concerns apply here."
+    },
+    {
+      "id": "1oIumdo4PBhZOwx9lzrQA_o6kSIJ8QpMwapOOfRYmkcY",
+      "name": "AutoMSP_Baseline_Capture_Worksheet",
+      "size_bytes": 7160,
+      "modifiedTime": "2026-08-30T10:45:10.624Z",
+      "selection_reason": "Most-recently-modified copy of a distinctly-named, business-process-sounding worksheet.",
+      "duplicate_warning": "3 other Sheets with the same or near-same title exist in the corpus (ids 1-pRPxJDKb4tcujIXWGz7PLu3Jgddta012EQyNMDxf_w, 1oXk6KPIiS12NGAvGtLwc_WEUdbTubTojHuboAbl9HL4, 1triof3PBnMXPO7sd2ej_sfxjeS3cnTWd1RqKMBnpTOA), sizes 7521/7521/7144 bytes, modified between 2026-08-28 and 2026-08-30. This worker profiled only the most-recently-modified copy; the others were NOT opened and may differ.",
+      "read_status": "SUCCESS - full read_file_content returned",
+      "structure_observed": "3-part internal structure: (1) an instructions/preamble section explaining how to use the sheet, (2) a data-capture section with labeled fields for baseline business metrics, (3) a metric-register section. One column is explicitly labeled in-sheet as being 'calculated automatically, do not overwrite' - this column rendered with only its computed value (or blank), no formula text, in the read_file_content output. Cells reported by the tool as merged were marked with a literal '[merged]' marker in the markdown rendering.",
+      "canonicalization_needs": "The 'calculated automatically' column is a formula-derived field; a faithful canonical copy needs the Sheets API to retrieve the actual formula, not just the point-in-time computed value read_file_content returns. Merge-cell layout (marked '[merged]') would need to be resolved/documented before any tabular (e.g. CSV/DB) import, since a naive flatten would misalign merged-cell values with in stodgy row/column positions."
+    },
+    {
+      "id": "1bxxhDFd2-jhYrcKDQs3cVsDewuyEwaX4H0wwu6kc2dg",
+      "name": "My New Opportunities (Trello Dashboard)",
+      "size_bytes": 346732,
+      "createdTime": "2023-11-28T07:32:13.173Z",
+      "modifiedTime": "2023-12-31T10:18:40.596Z",
+      "selection_reason": "Title suggested a business-critical operational dashboard.",
+      "read_status": "SUCCESS - full read_file_content returned, but content did NOT match the title",
+      "structure_observed": "IMPORTANT FINDING: despite the '(Trello Dashboard)' title, the actual sheet content is NOT a Trello export or sync. It contains what appears to be dbohra.com-related data and a BNI (Business Network International) member/chapter directory - unrelated business-directory/contact data, not project-board/task data. This is a title-vs-content mismatch: file names in this corpus cannot be trusted as a reliable guide to actual content.",
+      "canonicalization_needs": "Any ingestion pipeline that classifies or routes files by filename/title alone will misfile this record. Content-based classification (or manual review) is needed before this file could be canonicalized as anything - its true subject (BNI directory / dbohra.com data) should be re-confirmed by a human before use, since it sat under a misleading name for over 2.5 years (last modified Dec 2023, evidence retrieved Sep 2026)."
+    },
+    {
+      "id": "1GfJghTsJs_bzHgAquI6YklLOMLWMdxQtiVKZeiPZ84k",
+      "name": "botdirectory_bots",
+      "size_bytes": 167529,
+      "modifiedTime": "2026-09-06T09:05:23.346Z",
+      "selection_reason": "Largest of 4 same-titled 'botdirectory_bots' Sheets by raw file size; most recently active cluster of edits in the corpus (all 4 copies modified within the same ~90-second window on 2026-09-06, suggesting an automated/scripted write).",
+      "id_confidence_note": "3 other Sheets titled identically exist (ids 1h_NI9qGD1tINdchJn28Eq13ua1bLdwX5MGWz_BaKcWY, 1pxW2jJX2Jx9mxNIKFpklQrb50p-KewYvsyn8yeFHJRo, 1eMXQ4bMOYhMdATLuDjtrolI8vvyaWrgKcOQ394aMm7Y). This ID is the best-match candidate for the record this worker attempted to read (identified by size proximity to the observed overflow); exact identity was not re-verified before this emergency write per explicit instruction not to re-query Drive.",
+      "read_status": "FAILED - read_file_content result exceeded this session's tool-result rendering limit at 335,926 characters. Content was saved server-side to an overflow file but was NOT read in chunks (chunk-reading was deliberately avoided to not bulk-pull a large data table into context, per the mission's structure-not-values mandate). Only Drive metadata (id/name/size/timestamps) is available for this record in this profile.",
+      "structure_observed": "UNKNOWN - could not be determined without reading the overflow content.",
+      "canonicalization_needs": "This is a Task D capability finding as much as a Task C one: read_file_content is not a reliable universal ingestion path for large Sheets. A real pipeline would need either the Sheets API's values.get (paged) or an exported CSV/XLSX per-tab rather than this tool's single natural-language rendering."
+    },
+    {
+      "id": "1XHAVDnbdc7hpSl7BYsjq2OQFbJHQU4X_UQL-2sCt--w",
+      "name": "Financial Model - My New Opportunities",
+      "size_bytes": 1111981,
+      "createdTime": "2024-03-05T11:04:23.486Z",
+      "modifiedTime": "2024-04-09T11:59:55.921Z",
+      "selection_reason": "Largest / most business-critical-by-name of two similarly-titled 'Financial Model' records (the other, id 1y0PrvilrLM07ZjR4HGUHA5kqflcjLBrQid8B9zxC6YQ, '_Financial Model - My New Opportunities.xlsx (Converted - 2025-11-05 12:14)', is 174284 bytes and was not opened).",
+      "id_confidence_note": "Best-match candidate by size for the overflow observed; not re-verified before this emergency write.",
+      "read_status": "FAILED - read_file_content result exceeded this session's tool-result rendering limit at 134,487 characters. Not read in chunks, for the same reason as botdirectory_bots above.",
+      "structure_observed": "UNKNOWN - could not be determined without reading the overflow content.",
+      "canonicalization_needs": "EXPLICIT WARNING GIVEN THE FILE NAME: if/when this sheet is ever read, its content must be treated purely as a snapshot for structural understanding. An AI-generated restatement of financial-model figures must never be treated as, or substitute for, the canonical financial record - the canonical record is this Sheet (or its authoritative export) itself, version-controlled and reconciled by a human, not a Claude-generated summary of it."
+    }
+  ],
+  "sheets_not_profiled": {
+    "count_in_sample_not_opened": 103,
+    "note": "The remaining 103 of the 108 retrieved Sheet records (see w3-gdrive-inventory.json, category google_sheets) were never opened with read_file_content - only their Drive metadata (name/size/timestamps/parent) is known. Their internal structure is entirely UNKNOWN."
+  }
+}

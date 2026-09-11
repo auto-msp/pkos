@@ -1,0 +1,145 @@
+{
+ "captured_at": "2026-09-11T12:50:00Z",
+ "purpose": "The full shape of Moiz's Airtable estate as measured on this date, so `gaps` can report what Phase 12 still owes instead of implying the captured snapshots are the whole of it (SOW 107).",
+ "workspaces": [
+  {
+   "id": "wsp3RHauP7jLxQAIN",
+   "name": "AutoMSP (Instagram Automation)",
+   "permissionLevel": "owner"
+  },
+  {
+   "id": "wspB5bO8pWFXdxgnE",
+   "name": "AutoMSP (Internal Use)",
+   "permissionLevel": "owner"
+  },
+  {
+   "id": "wspcYJiTU6viSzNSE",
+   "name": "AutoMSP - Enterprise Client Delivery System ($1000 Start-UP credits account)",
+   "permissionLevel": "owner"
+  },
+  {
+   "id": "wsperJ6jYWLRwRzzt",
+   "name": "Project Management",
+   "permissionLevel": "owner"
+  },
+  {
+   "id": "wspwcjn1XSXemboNr",
+   "name": "AutoMSP - Client Acquistion",
+   "permissionLevel": "owner"
+  }
+ ],
+ "bases": [
+  {
+   "id": "appkFemlPJYiaY72e",
+   "name": "BOS",
+   "tables": 3,
+   "captured_tables": 2,
+   "captured_records": 41,
+   "declared_records": 15,
+   "note": "the third table holds Airtable's demo template rows"
+  },
+  {
+   "id": "appSmkEFE8UCSwjag",
+   "name": "AutoMSP - Enterprise Client Delivery System",
+   "tables": 6,
+   "captured_tables": 4,
+   "captured_records": 74,
+   "declared_records": 203,
+   "note": "Companies (83) and My Current Subscriptions (120) measured but not captured"
+  },
+  {
+   "id": "applMUBiXznegMHIf",
+   "name": "Powerful AI Agent Builds",
+   "tables": 1,
+   "captured_tables": 1,
+   "captured_records": 10,
+   "declared_records": 0
+  },
+  {
+   "id": "appieleuYGlnOJVYt",
+   "name": "Instagram Intelligence",
+   "tables": 4,
+   "captured_tables": 0,
+   "captured_records": 0,
+   "declared_records": 1,
+   "note": "Reels 1 (all cells empty), Comments 0; DM Resources and Influencers not probed"
+  },
+  {
+   "id": "appilvwIhyDklo37u",
+   "name": "AutoMSP Financial Tracker",
+   "tables": 5,
+   "captured_tables": 0,
+   "captured_records": 0,
+   "declared_records": 0,
+   "note": "MEASURED EMPTY: Revenue 0, Expenses 0, Clients 0. The tracker exists but has never been filled in."
+  },
+  {
+   "id": "appnUzUkRPgthsKGa",
+   "name": "Marvel Super Heroes",
+   "tables": 9,
+   "captured_tables": 2,
+   "captured_records": 100,
+   "declared_records": 52,
+   "note": "the BOS hero system. CAPTURED: BOS Action Tracker 3 (62 actions, Jun 10-23 2026) and HEROES (38 rows = 32 real heroes + 6 section/catalogue rows). Still declared: BOS Action Tracker (52, likely superseded by Tracker 3); six further tables never probed."
+  },
+  {
+   "id": "appgczWri1I6BfWq3",
+   "name": "TaskOps",
+   "tables": 3,
+   "captured_tables": 0,
+   "captured_records": 0,
+   "declared_records": 6,
+   "note": "Tasks 6; People and Projects not probed"
+  },
+  {
+   "id": "app4AXQuZrlcB3ZgQ",
+   "name": "Project Tracker",
+   "tables": 3,
+   "captured_tables": 0,
+   "captured_records": 0,
+   "declared_records": null,
+   "note": "Airtable project-template copy, not probed"
+  },
+  {
+   "id": "appiA5JTZRcAx9pJo",
+   "name": "Project Tracker",
+   "tables": 3,
+   "captured_tables": 0,
+   "captured_records": 0,
+   "declared_records": null,
+   "note": "duplicate of the above by name; Airtable template copy, not probed"
+  },
+  {
+   "id": "appT8j0NoiqP7doHU",
+   "name": "Project Task Tracker",
+   "tables": 3,
+   "captured_tables": 0,
+   "captured_records": 0,
+   "declared_records": null,
+   "note": "Airtable template copy, not probed"
+  },
+  {
+   "id": "appYutJsDeEHubDvS",
+   "name": "Project Task Tracker",
+   "tables": 3,
+   "captured_tables": 0,
+   "captured_records": 0,
+   "declared_records": null,
+   "note": "duplicate by name; Airtable template copy, not probed"
+  }
+ ],
+ "totals": {
+  "bases": 11,
+  "tables": 38,
+  "tables_captured": 9,
+  "records_captured": 225,
+  "records_measured_but_not_captured": 255,
+  "tables_not_probed": 21
+ },
+ "what_phase_12_still_owes": [
+  "Companies (83) and My Current Subscriptions (120) in the Enterprise base",
+  "BOS Action Tracker (52) - probably superseded by Tracker 3, worth diffing before capturing",
+  "record counts for the 21 tables never probed, all in template-shaped bases"
+ ],
+ "fleet_note": "BumbleBee (150.136.35.253) was added to BOS > AutoMSP Infrastructure on 2026-09-11 as record recfXasgVZjiLSpZP, and the Dify record in the Enterprise base now names it as its host."
+}

@@ -1,0 +1,74 @@
+{
+  "$schema_note": "Worker W2 - Task C (org repository inventory). See pkos/00-discovery/W2-github-report.md for full narrative and LIMITATIONS.",
+  "generated_at": "2026-09-07T04:44:44Z",
+  "generated_by": "discovery-worker-W2",
+  "status": "BLOCKED_NO_DATA",
+  "status_meaning": "Zero records could be retrieved from the API. This does NOT mean the org has no repos - it means this session could not query GitHub for org repo data at all.",
+  "org": "auto-msp",
+  "total_captured": 0,
+  "total_existing": "unknown - could not be determined, GitHub never returned a payload",
+  "repos": [],
+  "fields_that_would_have_been_captured_per_repo": [
+    "name", "description", "visibility", "language", "size", "created_at",
+    "pushed_at", "default_branch", "topics", "archived"
+  ],
+  "requests_attempted": [
+    {
+      "purpose": "org repo listing",
+      "method": "GET",
+      "url": "https://api.github.com/orgs/auto-msp/repos?per_page=100&type=all",
+      "http_status_received": 403,
+      "response_body": "{\"message\":\"This GitHub API path is not available: sessions are bound to their configured repositories. Use repository-scoped endpoints (repos/{owner}/{repo}/...).\",\"documentation_url\":\"https://docs.anthropic.com/en/docs/claude-code/github-actions\"}",
+      "reached_real_github": false
+    },
+    {
+      "purpose": "org profile (fallback identity check)",
+      "method": "GET",
+      "url": "https://api.github.com/orgs/auto-msp",
+      "http_status_received": 403,
+      "response_body": "{\"message\":\"This GitHub API path is not available: sessions are bound to their configured repositories. Use repository-scoped endpoints (repos/{owner}/{repo}/...).\",\"documentation_url\":\"https://docs.anthropic.com/en/docs/claude-code/github-actions\"}",
+      "reached_real_github": false
+    },
+    {
+      "purpose": "single repo, testing whether repo-scoped path unlocks access",
+      "method": "GET",
+      "url": "https://api.github.com/repos/auto-msp/automsp-platform",
+      "http_status_received": 403,
+      "response_body": "{\"message\":\"GitHub access to this repository is not enabled for this session. Use add_repo to request access. If add_repo answers that read access is already available and you need GitHub API or write access, call add_repo again with access:\\\"push\\\" to attach the repository with credentials.\",\"documentation_url\":\"https://docs.anthropic.com/en/docs/claude-code/github-actions\"}",
+      "reached_real_github": false
+    },
+    {
+      "purpose": "single repo, second known repo",
+      "method": "GET",
+      "url": "https://api.github.com/repos/auto-msp/automsp-obsidian-vault",
+      "http_status_received": 403,
+      "response_body": "same as above (GitHub access to this repository is not enabled for this session)",
+      "reached_real_github": false
+    },
+    {
+      "purpose": "control test: unrelated well-known public repo, to prove the block is session-wide (zero repos enabled) rather than specific to auto-msp",
+      "method": "GET",
+      "url": "https://api.github.com/repos/octocat/Hello-World",
+      "http_status_received": 403,
+      "response_body": "same 'GitHub access to this repository is not enabled for this session' message",
+      "reached_real_github": false,
+      "conclusion": "Confirms zero repositories of any kind are enabled for this session - the block is not specific to the auto-msp org."
+    }
+  ],
+  "evidence_none_reached_github": "None of the above 403 responses carried X-RateLimit-* headers (which every genuine GitHub API response includes). A GET https://api.github.com/rate_limit taken after all five attempts still showed used=0/remaining=15000/limit=15000, identical to the pre-attempt baseline - proving these requests were rejected by the session proxy and never reached GitHub's servers.",
+  "context_only_unverified_repo_names": [
+    {
+      "full_name": "auto-msp/automsp-platform",
+      "status": "NAME ONLY - not independently verified by W2 in this session",
+      "source": "supplied in W2's task briefing as prior context (Next.js 16 / React 19 / Prisma 7 main repo)",
+      "metadata_captured": "none - the API call for this repo returned 403 before any data was returned"
+    },
+    {
+      "full_name": "auto-msp/automsp-obsidian-vault",
+      "status": "NAME ONLY - not independently verified by W2 in this session",
+      "source": "supplied in W2's task briefing as prior context (public Obsidian vault repo)",
+      "metadata_captured": "none - the API call for this repo returned 403 before any data was returned"
+    }
+  ],
+  "note": "These two names must not be treated as a complete or confirmed org inventory. The org may contain more, fewer, or differently-named/visibility repos than these two - this could not be checked."
+}

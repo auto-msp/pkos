@@ -1,0 +1,13 @@
+﻿__pycache__/
+*.pyc
+02-canonical/
+95-transfer/
+*.sqlite3
+*.sqlite3-wal
+*.sqlite3-shm
+evidence/blobs/
+*.tar.gz
+skeleton.tar.gz
+
+# raw server audits: root crontabs + systemd units carry live secrets
+90-evidence/servers/

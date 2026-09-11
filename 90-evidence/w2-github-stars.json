@@ -1,0 +1,40 @@
+{
+  "$schema_note": "Worker W2 - Task B (starred repositories, spec section 76). See pkos/00-discovery/W2-github-report.md for full narrative and LIMITATIONS.",
+  "generated_at": "2026-09-07T04:44:44Z",
+  "generated_by": "discovery-worker-W2",
+  "status": "BLOCKED_NO_DATA",
+  "status_meaning": "Zero records could be retrieved. This is NOT a rate-limit exhaustion (budget was untouched) and NOT an empty result (account may well have stars) - it is a categorical access block at the network-proxy layer, confirmed session-wide. Do not treat total_captured=0 as evidence the account has no stars.",
+  "accounts_attempted": [
+    {
+      "login": "mynewopportunities",
+      "evidence_for_identity": "see w2-github-report.md Task A section",
+      "api_verified": false,
+      "api_verification_blocked_reason": "GET /users/mynewopportunities returned HTTP 403 from the session proxy before reaching GitHub"
+    }
+  ],
+  "total_captured": 0,
+  "total_existing_per_account": "unknown - could not be determined, GitHub never returned a payload",
+  "star_records": [],
+  "fields_that_would_have_been_captured_per_record": [
+    "full_name", "html_url", "owner", "description", "topics", "language",
+    "stargazers_count", "created_at", "pushed_at", "updated_at", "archived",
+    "fork", "license.spdx_id", "homepage", "size", "open_issues_count", "starred_at"
+  ],
+  "request_attempted": {
+    "method": "GET",
+    "url": "https://api.github.com/users/mynewopportunities/starred?per_page=100",
+    "headers": {
+      "Accept": "application/vnd.github.star+json"
+    },
+    "http_status_received": 403,
+    "response_body": "{\"message\":\"This GitHub API path is not available: sessions are bound to their configured repositories. Use repository-scoped endpoints (repos/{owner}/{repo}/...).\",\"documentation_url\":\"https://docs.anthropic.com/en/docs/claude-code/github-actions\"}",
+    "reached_real_github": false,
+    "evidence_it_never_reached_github": "response carried no X-RateLimit-* headers, and a fresh GET https://api.github.com/rate_limit taken immediately after showed used=0/limit=15000 - identical to before any blocked calls were made"
+  },
+  "why_this_endpoint_is_categorically_blocked": "The session's outbound proxy only permits GitHub REST paths matching repos/{owner}/{repo}/... for repositories explicitly enabled for this session (via an 'add_repo' mechanism not present in this worker's toolset). GET /users/{user}/starred is not a repos/{owner}/{repo}/... path, so no amount of per-repo enabling would unlock it - it is out of scope for this proxy's design entirely, not merely 'not yet granted'.",
+  "alternative_local_evidence_search_result": "Searched the entire mounted 'AutoMSP BOS Claude Project' folder for any locally-cached export of GitHub stars (CSV/JSON exports, browser bookmark exports, etc.). None found. One adjacent document, AutoMSP_Skills_Inventory_and_OSS_Landscape.md, ranks OSS projects by star/fork counts, but it is an external market-landscape research survey (dated 2026-09-06, framed explicitly as 'what could you build this with' rather than 'what has this account starred') - it is NOT the user's personal starred-repo list and must not be substituted for Task B data.",
+  "deferred_enrichment_not_attempted": [
+    "README bodies for individual starred repos (out of scope even if the endpoint had worked, per instructions)"
+  ],
+  "remediation_for_next_run": "A worker/session with either (a) a genuinely unauthenticated network path to api.github.com (bypassing this proxy), or (b) the 'add_repo'-equivalent capability to enable the target user's public data endpoints, would be required to complete this task. Neither was available to W2."
+}
