@@ -83,7 +83,21 @@ PARSE_VERSION = 2
 
 NOTE_EXT = {".md", ".markdown"}
 CANVAS_EXT = {".canvas"}
-SKIP_DIRS = {".obsidian", ".trash", ".git", ".smart-env", ".space"}
+# A vault is not a filesystem, and this adapter forgot it. The filesystem
+# adapter has carried SOW 75's exclusion lists since Phase 6; this one skipped
+# only Obsidian's own metadata directories and then ingested EVERYTHING else.
+# On the real vault that meant 21,204 .js files, 9,814 source maps, 3,626 .pyc
+# and 6,486 .ts - roughly fifty thousand build artefacts written into an
+# append-only evidence plane, from which nothing can ever be removed. A vault
+# that has a code project inside it is normal; storing that project's
+# node_modules as personal knowledge is not.
+#
+# The lists are imported rather than copied so the two adapters can never
+# drift apart on what counts as knowledge.
+from .filesystem import EXCLUDE_EXT, EXCLUDE_DIRS
+
+VAULT_META_DIRS = {".obsidian", ".trash", ".smart-env", ".space", ".stversions"}
+SKIP_DIRS = VAULT_META_DIRS | EXCLUDE_DIRS
 
 
 class ObsidianAdapter(BaseAdapter):
@@ -93,15 +107,17 @@ class ObsidianAdapter(BaseAdapter):
     acquisition_method = "filesystem"
     auth_method = "none"
 
-    def __init__(self, *a, identity=None, **kw):
+    def __init__(self, *a, identity=None, include_excluded=False, **kw):
         super().__init__(*a, **kw)
         self.identity = identity
+        self.include_excluded = include_excluded
         self.stats = {"notes": 0, "canvases": 0, "attachments": 0,
                       "wikilinks_found": 0, "markdown_links_found": 0,
                       "external_links": 0, "links_resolved": 0,
                       "links_to_missing_notes": 0, "ambiguous_links": 0,
                       "embeds": 0, "tags_found": 0, "distinct_tags": 0,
                       "daily_notes": 0, "frontmatter_parsed": 0,
+                      "skipped_code_files": 0, "skipped_excluded_dirs": 0,
                       "frontmatter_unparseable": 0, "empty_globs": []}
         self._by_name = {}
         self._by_path = {}
@@ -141,9 +157,18 @@ class ObsidianAdapter(BaseAdapter):
         for p in sorted(root.rglob("*")):
             if not p.is_file() or p.is_symlink():
                 continue
-            if any(part in SKIP_DIRS for part in p.relative_to(root).parts[:-1]):
+            rel_parts = p.relative_to(root).parts
+            if any(part in SKIP_DIRS for part in rel_parts[:-1]):
+                self.stats["skipped_excluded_dirs"] += 1
                 continue
             if p.name.startswith("."):
+                continue
+            if p.suffix.lower() in EXCLUDE_EXT and not self.include_excluded:
+                self.stats["skipped_code_files"] += 1
+                self.stats.setdefault("skipped_by_extension", {})
+                ext = p.suffix.lower()
+                self.stats["skipped_by_extension"][ext] = \
+                    self.stats["skipped_by_extension"].get(ext, 0) + 1
                 continue
             files.append(p)
         if not files:

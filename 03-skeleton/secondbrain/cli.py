@@ -116,8 +116,9 @@ def cmd_ingest(a):
         return 2
     conn, p = _conn(a)
     kw = {}
-    if a.adapter == "filesystem":
+    if a.adapter in ("filesystem", "obsidian"):
         kw["include_excluded"] = a.include_excluded
+    if a.adapter == "filesystem":
         kw["recurse"] = not a.no_recurse
     if a.adapter == "bookmarks":
         kw["browser"] = a.browser

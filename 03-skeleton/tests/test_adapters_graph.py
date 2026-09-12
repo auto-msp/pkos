@@ -251,6 +251,51 @@ def main():
             one(root, "SELECT COUNT(*) FROM evidence_blob"
                       " WHERE original_filename='credentials.json'") == 0)
 
+    # ------------------------------------ a vault is not a filesystem
+    # The first real ingest pulled 21,204 .js, 9,814 source maps and 3,626
+    # .pyc into an append-only evidence plane, because this adapter skipped
+    # only Obsidian's metadata folders while the filesystem adapter has
+    # carried SOW 75's exclusion lists since Phase 6. A vault containing a
+    # code project is normal; storing that project's node_modules as personal
+    # knowledge is not, and evidence cannot be un-written.
+    print("\nSOW 75 EXCLUSIONS APPLY TO VAULTS TOO")
+    cv = fx / "code-vault"
+    (cv / "notes").mkdir(parents=True)
+    (cv / "app" / "node_modules" / "react").mkdir(parents=True)
+    (cv / "app" / "dist").mkdir(parents=True)
+    (cv / "notes" / "Real.md").write_text(
+        "# Real\n\nSee [Other](Other.md).\n#MSP\n", encoding="utf-8")
+    (cv / "notes" / "Other.md").write_text("# Other\n", encoding="utf-8")
+    (cv / "pic.png").write_bytes(b"\x89PNGfake")
+    for i in range(40):
+        (cv / "app" / "node_modules" / "react" / ("m%d.js" % i)).write_text(
+            "module.exports=%d" % i, encoding="utf-8")
+    for i in range(15):
+        (cv / "app" / "dist" / ("b%d.js.map" % i)).write_text("{}", encoding="utf-8")
+    (cv / "app" / "main.py").write_text("print(1)\n", encoding="utf-8")
+    (cv / "app" / "main.pyc").write_bytes(b"fakebytecode")
+
+    dcv, _ = ingest(root, "obsidian", cv, "--identity", "code-vault")
+    stv = (dcv or {}).get("adapter_stats", {})
+    s.check("58 files on disk, only the 3 knowledge files ingested",
+            dcv and dcv["discovered"] == 3,
+            "discovered=%s" % (dcv or {}).get("discovered"))
+    s.check("node_modules and dist were skipped wholesale",
+            stv.get("skipped_excluded_dirs", 0) >= 55,
+            "got %s" % stv.get("skipped_excluded_dirs"))
+    s.check("loose .py and .pyc excluded by extension",
+            stv.get("skipped_code_files") == 2
+            and set(stv.get("skipped_by_extension", {})) == {".py", ".pyc"},
+            "%s" % stv.get("skipped_by_extension"))
+    s.check("no build artefact reached the evidence plane",
+            one(root, "SELECT COUNT(*) FROM evidence_blob"
+                      " WHERE original_filename LIKE '%.js'"
+                      "    OR original_filename LIKE '%.map'"
+                      "    OR original_filename LIKE '%.pyc'") == 0)
+    s.check("and the real notes still linked to each other",
+            stv.get("links_resolved", 0) >= 1,
+            "resolved=%s" % stv.get("links_resolved"))
+
     # ------------------------------------------- placeholders vs secrets
     # The first real scan of the live store returned 370 findings across
     # 39,766 objects. Reading them showed the list was two populations mixed
