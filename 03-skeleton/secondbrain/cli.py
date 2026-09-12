@@ -547,7 +547,8 @@ def cmd_secrets(a):
         if not found:
             payload["redacted"] = 0
         else:
-            n = sec.redact(conn, found)
+            n = sec.redact(conn, found,
+                           surgical=not getattr(a, 'whole_body', False))
             payload["redacted"] = n
     if _out(a, payload):
         return 0
@@ -571,7 +572,10 @@ def cmd_secrets(a):
         print("  Drive share link exactly as happily as a live credential, and")
         print("  redaction replaces the whole body with a marker (SOW 97).")
     if a.redact:
-        print("\n  REDACTED %d object body/bodies." % payload["redacted"])
+        print("\n  REDACTED %d object body/bodies (%s)."
+              % (payload["redacted"],
+                 "whole body" if getattr(a, "whole_body", False)
+                 else "matched spans only; rest of each document kept"))
         print("  Raw bytes untouched in the evidence plane. Each redaction is a")
         print("  new version (change_type=corrected) with an event, so it is")
         print("  auditable and reversible - never silent (SOW 10, 11, 125.10).")
@@ -1059,6 +1063,10 @@ def build_parser():
     s = add("secrets", cmd_secrets, "scan canonical bodies for credential material (SOW 28)")
     s.add_argument("--redact", action="store_true",
                    help="replace offending bodies with a marker; evidence plane untouched")
+    s.add_argument("--whole-body", action="store_true",
+                   help="replace the ENTIRE body with a marker instead of just "
+                        "the matched spans. Rarely right: it removes the "
+                        "document along with the key")
     s.add_argument("--sample", action="store_true",
                    help="show WHAT matched, in context and masked, plus the "
                         "distribution by object class and source. Run this "

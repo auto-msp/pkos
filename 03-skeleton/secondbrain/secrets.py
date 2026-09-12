@@ -60,8 +60,12 @@ PATTERNS = [
     ("query_secret",    re.compile(
         r"[?&](?:token|api[_-]?key|access[_-]?token|auth[_-]?token|secret|"
         r"password|passwd|pwd|signature)=[A-Za-z0-9_\-\.~%]{8,}", re.I)),
+    # The [text](url) form of markdown reads as "a URL followed by a bracketed
+    # blob" and matched every markdown link in the corpus. Require the bracket
+    # to hold ONLY the token - no scheme, no slashes, no spaces.
     ("token_beside_url", re.compile(
-        r"https?://\S{4,}[\s]*[\(\[][\s]*[A-Za-z0-9_\-]{24,}[\s]*[\)\]]")),
+        r"https?://[^\s()\[\]]{4,}[ \t]*[\(\[][ \t]*"
+        r"(?![a-z]+://)[A-Za-z0-9_\-]{24,}[ \t]*[\)\]]")),
     # A data-export download URL is a bearer token for an entire account's
     # history. Single-use and short-lived, but live until claimed - and an
     # export manifest sitting in Downloads gets ingested like any other file.
@@ -75,11 +79,80 @@ MARKER = ("[REDACTED BY PKOS — this object contained credential material.\n"
           " anything a model can read (SOW 28, 32).]\n")
 
 
+# --------------------------------------------------------------------------
+# Placeholders are not secrets
+# --------------------------------------------------------------------------
+# A knowledge store that ingests chat logs and config files is full of
+# documentation: `postgresql://user:pass@localhost`, `api_key=YOUR_KEY_HERE`,
+# `${DB_PASSWORD}`. Those match every credential pattern ever written, and
+# treating them as findings buries the real ones - 87 connection-string
+# examples hid one live Supabase URL in this store's first real scan. The
+# point of filtering them is not tidiness; it is that a finding list nobody
+# can read is a finding list nobody acts on.
+PLACEHOLDER = re.compile(
+    r"(your[_-]?\w*|my[_-]?(user|pass|key|token|secret)|example|sample|dummy|"
+    r"placeholder|change[_-]?me|replace[_-]?me|insert[_-]?\w+|xxx+|"
+    r"<[^>]{1,40}>|\$\{[^}]{1,40}\}|\$[A-Z_]{3,}|_here\b|here$|"
+    r"^(user|username|admin|root|postgres|mysql|redis|test|demo|foo|bar)"
+    r"[:/]?(pass|password|passwd|secret|admin|root|postgres|mysql|test|123)?$)",
+    re.I)
+
+
+def looks_placeholder(value):
+    """True when a matched span is documentation rather than a credential."""
+    v = (value or "").strip()
+    if not v:
+        return True
+    # strip the surrounding syntax so the test sees the value itself
+    core = re.sub(r"^[?&]?[A-Za-z_\-]{1,24}=", "", v)
+    core = re.sub(r"^://", "", core).rstrip("@")
+    if PLACEHOLDER.search(core):
+        return True
+    # user:pass style pairs where BOTH halves are generic words
+    if ":" in core:
+        left, _, right = core.partition(":")
+        generic = {"user", "username", "pass", "password", "passwd", "admin",
+                   "root", "postgres", "mysql", "redis", "test", "demo",
+                   "secret", "changeme", "guest", "dbuser", "dbpass"}
+        if left.lower() in generic and right.lower().rstrip("@") in generic:
+            return True
+    return False
 def scan_body(body):
-    """Return the list of secret types found in a body, or []."""
+    """Credential kinds present in a body, placeholders excluded."""
     if not body:
         return []
-    return [name for name, rx in PATTERNS if rx.search(body)]
+    out = []
+    for name, rx in PATTERNS:
+        for m in rx.finditer(body):
+            if looks_placeholder(m.group(0)):
+                continue
+            out.append(name)
+            break
+    return out
+
+
+def scan_spans(body):
+    """Every non-placeholder match as (start, end, kind), earliest first.
+
+    Surgical redaction needs the spans, not just the kinds: replacing a whole
+    5,000-line config file because one line held an API key removes the key and
+    the other 4,999 lines of knowledge with it.
+    """
+    if not body:
+        return []
+    spans = []
+    for name, rx in PATTERNS:
+        for m in rx.finditer(body):
+            if not looks_placeholder(m.group(0)):
+                spans.append((m.start(), m.end(), name))
+    spans.sort()
+    merged = []
+    for a, b, k in spans:
+        if merged and a <= merged[-1][1]:
+            merged[-1] = (merged[-1][0], max(merged[-1][1], b), merged[-1][2])
+        else:
+            merged.append((a, b, k))
+    return merged
 
 
 def find_all(conn, limit=None):
@@ -149,10 +222,24 @@ def sample(conn, per_pattern=8, window=44):
     return {"examples": dict(examples),
             "by_class": {k: dict(v) for k, v in by_class.items()},
             "by_source": {k: dict(v) for k, v in by_source.items()}}
-def redact(conn, findings, actor="human:moiz"):
-    """Replace each body with the marker, reclassify RESTRICTED, version + log.
+def redact(conn, findings, actor="human:moiz", surgical=True):
+    """Remove credential material from canonical bodies. Evidence never touched.
 
-    Evidence blobs are never touched.
+    Two modes, and the default changed for a reason.
+
+    SURGICAL (default) replaces only the matched spans, leaving the rest of the
+    body intact. WHOLE-BODY replaces everything with a marker. The original
+    implementation only did whole-body, which is the right instrument when a
+    body IS a credential and the wrong one everywhere else: this store's first
+    real scan found keys inside deployment notes, docker-compose files and
+    long Claude conversations, and blanking those would have destroyed
+    thousands of lines of knowledge to remove forty characters. Protecting a
+    secret by deleting the document that explains it is not a good trade.
+
+    Either way the object is reclassified RESTRICTED, the change is a new
+    version with change_type=corrected, an event is recorded, and the evidence
+    blob keeps the original bytes - so the redaction is auditable and
+    reversible, never silent (SOW 10, 11, 125.10).
     """
     from .canonical import add_version, add_provenance
     from .events import record_event, audit
@@ -162,10 +249,24 @@ def redact(conn, findings, actor="human:moiz"):
         prov = conn.execute(
             "SELECT * FROM provenance WHERE object_id=? ORDER BY rowid DESC LIMIT 1",
             (oid,)).fetchone()
+        new_body = MARKER + "\ndetected: " + ", ".join(f["kinds"]) + "\n"
+        if surgical:
+            row = conn.execute(
+                "SELECT v.body FROM object o JOIN object_version v"
+                " ON v.version_id=o.current_version WHERE o.object_id=?",
+                (oid,)).fetchone()
+            if row and row["body"]:
+                body, out, last = row["body"], [], 0
+                for a, b, kind in scan_spans(body):
+                    out.append(body[last:a])
+                    out.append("[REDACTED:%s]" % kind)
+                    last = b
+                out.append(body[last:])
+                new_body = "".join(out)
         vid = add_version(
             conn, oid, "corrected", actor,
             content_hash=(prov["canonical_hash"] if prov else None),
-            body=MARKER + "\ndetected: " + ", ".join(f["kinds"]) + "\n",
+            body=new_body,
             change_reason="credential material removed from canonical body "
                           "(SOW 28); raw bytes retained in the evidence plane",
             validation_status="PASSED")
@@ -185,6 +286,7 @@ def redact(conn, findings, actor="human:moiz"):
                      reason="secret redaction: " + ",".join(f["kinds"]))
         n += 1
     audit(conn, "security", "redact_secrets", "OK",
-          actor=actor, detail={"objects": n})
+          actor=actor, detail={"objects": n,
+                               "mode": "surgical" if surgical else "whole_body"})
     conn.commit()
     return n

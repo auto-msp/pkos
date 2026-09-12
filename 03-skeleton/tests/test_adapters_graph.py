@@ -218,6 +218,49 @@ def main():
             one(root, "SELECT COUNT(*) FROM evidence_blob"
                       " WHERE original_filename='credentials.json'") == 0)
 
+    # ------------------------------------------- placeholders vs secrets
+    # The first real scan of the live store returned 370 findings across
+    # 39,766 objects. Reading them showed the list was two populations mixed
+    # together: live third-party keys, and documentation that merely LOOKS
+    # like keys - `postgresql://user:pass@localhost`, `api_key=YOUR_KEY_HERE`.
+    # A finding list nobody can read is a finding list nobody acts on, so the
+    # distinction is load-bearing and pinned here.
+    print("\nPLACEHOLDERS ARE NOT SECRETS")
+    from secondbrain import secrets as S
+    for text, expect_secret, why in [
+        ("postgresql://your_user:your_password@your_db_host", False, "docs template"),
+        ("postgresql://user:pass@localhost:5432/churn", False, "generic pair"),
+        ("postgresql://postgres:postgres@postgres:5432/tax", False, "compose default"),
+        ("DATABASE_URL: postgresql://wf:${DB_PASSWORD}@db:5432/x", False, "env var"),
+        ("?apiKey=YOUR_API_KEY_HERE&number=1", False, "placeholder value"),
+        ("[w95](https://github.com/w95/awesome-claude)", False, "markdown link"),
+        ("NOTION_API_KEY=ntn_590212562958bjcIgpZpmVFpQwErTyUiOpAsDfGh", True, "live notion token"),
+        ("postgresql://postgres.abc:Rx8kLm2QpVn4Zdli1@db.xyz.supabase.co:5432/postgres", True, "live connection string"),
+    ]:
+        got = bool(S.scan_body(text))
+        s.check("%-22s %s" % (why, "-> secret" if expect_secret else "-> ignored"),
+                got == expect_secret, "" if got == expect_secret else "got %s" % got)
+
+    print("\nSURGICAL REDACTION KEEPS THE DOCUMENT")
+    doc = ("# Deploy notes\nRelay on Ratchet behind Caddy.\n"
+           "remote.sendgrid.auth.secret = \"SG.ONQabcdefghijklmnopqrst."
+           "uvwxyz1234567890ABCDEFGHIJKLMNOPQRSTUVW\"\n"
+           "Restart with: systemctl restart stalwart\n"
+           "Example for docs: postgresql://user:pass@localhost/db\n")
+    spans = S.scan_spans(doc)
+    s.check("exactly one span is redactable", len(spans) == 1,
+            "spans=%d" % len(spans))
+    out, last = [], 0
+    for a, b, k in spans:
+        out.append(doc[last:a]); out.append("[REDACTED:%s]" % k); last = b
+    out.append(doc[last:])
+    red = "".join(out)
+    s.check("the key is gone", "SG.ONQ" not in red)
+    s.check("every other line survives",
+            "systemctl restart stalwart" in red and "Relay on Ratchet" in red
+            and "postgresql://user:pass@localhost/db" in red,
+            "len %d -> %d" % (len(doc), len(red)))
+
     # -------------------------------------------------------- invariants
     print("\nINVARIANTS")
     v2, _ = sbj(root, "validate")
