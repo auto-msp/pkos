@@ -261,6 +261,51 @@ def main():
             and "postgresql://user:pass@localhost/db" in red,
             "len %d -> %d" % (len(doc), len(red)))
 
+    # --------------------------------- redaction must reach the DERIVED plane
+    # Redaction rewrites canonical bodies. The FTS index was built from the
+    # OLD bodies, so until it is rebuilt it still serves every secret that was
+    # just removed - and `no_secret_values_in_bodies` cannot see that, because
+    # it only reads bodies. Canonical spotless, validate green, index leaking.
+    # Exactly the silent shape this project keeps hitting, so it gets a test.
+    print("\nREDACTION REACHES THE DERIVED PLANE")
+    leak = fx / "leak"; leak.mkdir()
+    (leak / "cfg.md").write_text(
+        "# service config\nNOTION_API_KEY=ntn_590212562958bjcIgpZpmVFpQwErTyUiOpAsDfGh\n"
+        "the rest of this document is ordinary prose worth keeping\n",
+        encoding="utf-8")
+    ingest(root, "filesystem", leak)
+    sb(root, "rebuild-index", "--quiet")
+    pre, _ = sbj(root, "search", "ntn", "--limit", "3")
+    s.check("before redaction the index really does serve the secret",
+            pre is not None and len(pre.get("results", [])) >= 1,
+            "hits=%s" % (len(pre.get("results", [])) if pre else "n/a"))
+
+    sb(root, "secrets", "--redact")
+    v3, _ = sbj(root, "validate")
+    names = {c["check"]: c["status"] for c in (v3 or {}).get("checks", [])}
+    s.check("canonical is clean immediately",
+            names.get("no_secret_values_in_bodies") == "PASS")
+    # validate emits "ERROR" for a failed check, not "FAIL" - assert the
+    # string the tool actually produces, not the one that reads nicely.
+    s.check("but validate FAILS until the index is rebuilt",
+            names.get("derived_index_rebuilt_since_redaction") in ("ERROR", "FAIL")
+            and v3["status"] == "FAILED",
+            "check=%s status=%s" % (names.get("derived_index_rebuilt_since_redaction"),
+                                    (v3 or {}).get("status")))
+
+    sb(root, "rebuild-index", "--quiet")
+    v4, _ = sbj(root, "validate")
+    names4 = {c["check"]: c["status"] for c in (v4 or {}).get("checks", [])}
+    s.check("after rebuild-index the store is valid again",
+            names4.get("derived_index_rebuilt_since_redaction") == "PASS"
+            and v4["status"] == "PASSED",
+            "status=%s" % (v4 or {}).get("status"))
+    s.check("and the prose around the key survived the redaction",
+            "ordinary prose worth keeping" in (one(
+                root, "SELECT v.body FROM object o JOIN object_version v"
+                      " ON v.version_id=o.current_version"
+                      " WHERE o.title='cfg.md'") or ""))
+
     # -------------------------------------------------------- invariants
     print("\nINVARIANTS")
     v2, _ = sbj(root, "validate")

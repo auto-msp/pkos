@@ -203,7 +203,14 @@ def sample(conn, per_pattern=8, window=44):
     for r in conn.execute(q):
         body = r["body"]
         for name, rx in PATTERNS:
-            m = rx.search(body)
+            # Show the first match that is actually a FINDING. Using plain
+            # .search() here meant the triage output could display a
+            # placeholder as the example for an object that was flagged
+            # because of a real secret elsewhere in the same body - the
+            # evidence and the verdict disagreeing, which is worse than no
+            # evidence at all.
+            m = next((x for x in rx.finditer(body)
+                      if not looks_placeholder(x.group(0))), None)
             if not m:
                 continue
             by_class[name][r["object_class"] or "?"] += 1
@@ -285,8 +292,22 @@ def redact(conn, findings, actor="human:moiz", surgical=True):
                      previous_state=f["classification"], new_state="RESTRICTED",
                      reason="secret redaction: " + ",".join(f["kinds"]))
         n += 1
+    # The derived plane still holds what was just removed from canonical.
+    # Redaction rewrites bodies; the FTS index was built from the OLD bodies
+    # and keeps every redacted secret fully searchable until it is rebuilt.
+    # Nothing errored, canonical was clean, and `validate` passed - which is
+    # this project's exact signature failure mode. Mark the indexes stale so
+    # the gap is a recorded state rather than something only a person who
+    # happened to read the closing line of the redact output would know.
+    stale = conn.execute(
+        "UPDATE derived_index_registry SET status='STALE'"
+        " WHERE status <> 'STALE'").rowcount
     audit(conn, "security", "redact_secrets", "OK",
           actor=actor, detail={"objects": n,
-                               "mode": "surgical" if surgical else "whole_body"})
+                               "mode": "surgical" if surgical else "whole_body",
+                               "derived_indexes_marked_stale": stale,
+                               "warning": "the FTS index still contains the "
+                                          "redacted text until `rebuild-index` "
+                                          "runs"})
     conn.commit()
     return n

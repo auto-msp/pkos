@@ -164,6 +164,37 @@ def run(conn, paths, deep=False):
     chk("derived_indexes_registered", True,
         "%d derived index(es) stale and awaiting rebuild" % stale, severity="INFO")
 
+    # Redaction is only complete when the DERIVED plane has caught up.
+    # Canonical can be spotless while the FTS index still serves every secret
+    # that was removed from it, and `no_secret_values_in_bodies` cannot see
+    # that because it only reads bodies. So compare the clock: if the newest
+    # index was built before the last redaction, the index still holds the
+    # redacted text and this is a real failure, not an informational note.
+    last_redaction = conn.execute(
+        "SELECT MAX(timestamp) t FROM audit_event"
+        " WHERE category='security' AND action='redact_secrets'").fetchone()["t"]
+    if last_redaction:
+        # Compare STATUS, not clocks. The first version of this check compared
+        # built_at against the redaction timestamp, and both come from
+        # now_iso() at whole-second resolution - so a rebuild and a redaction
+        # in the same second made a leaking index look fresh. That is the third
+        # time second-resolution timestamps have produced a wrong answer in
+        # this project (the backup directory collision was the same bug with a
+        # different victim). redact() sets every index STALE and rebuild-index
+        # sets it FRESH, so the registry already carries the fact directly;
+        # asking it is both simpler and immune to the clock.
+        stale_rows = [r["index_name"] for r in conn.execute(
+            "SELECT index_name FROM derived_index_registry WHERE status='STALE'")]
+        built = conn.execute(
+            "SELECT MAX(built_at) t FROM derived_index_registry").fetchone()["t"]
+        chk("derived_index_rebuilt_since_redaction", not stale_rows,
+            ("%d index(es) STALE after a redaction at %s (%s) - run "
+             "`rebuild-index`; they still contain the redacted text"
+             % (len(stale_rows), last_redaction, ", ".join(stale_rows)))
+            if stale_rows else
+            "no stale index; last build %s, last redaction %s"
+            % (built or "never", last_redaction))
+
     integrity = None
     if deep:
         from . import evidence
