@@ -8,10 +8,27 @@ PKG = HERE.parent
 FAILURES = []
 
 
+def _env(root):
+    """A hermetic child environment.
+
+    The suite used to pass env={**os.environ, ...}, which inherits whatever
+    PKOS_ROOT / PKOS_DERIVED the operator has exported - and the runbook tells
+    you to export both. The result: every test store's derived plane was
+    silently redirected to the REAL store's derived directory, so tests that
+    assert on root/derived failed for reasons that had nothing to do with the
+    code. A test suite that only passes in a shell you have not configured is
+    not a test suite. Scrub the ambient PKOS_* and pin derived to this store.
+    """
+    env = {k: v for k, v in os.environ.items() if not k.startswith("PKOS_")}
+    env["PYTHONPATH"] = str(PKG if "PKG" in globals() else SKEL)
+    env["PKOS_ROOT"] = str(root)
+    env["PKOS_DERIVED"] = str(Path(root) / "derived")
+    return env
+
 def sb(root, *args, expect=0):
     r = subprocess.run([sys.executable, "-m", "secondbrain", "--root", str(root)] + list(args),
                        cwd=str(PKG), capture_output=True, text=True,
-                       env={**os.environ, "PYTHONPATH": str(PKG)})
+                       env=_env(root))
     if r.returncode != expect:
         FAILURES.append("exit %d (expected %d) for %s\n%s\n%s"
                         % (r.returncode, expect, " ".join(args), r.stdout[-1500:], r.stderr[-1500:]))

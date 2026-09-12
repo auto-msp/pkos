@@ -29,8 +29,14 @@ class Suite:
 
 
 def sb(root, *args):
-    env = dict(os.environ, PKOS_ROOT=str(root),
-               PKOS_DERIVED=str(root / "derived"), PYTHONPATH=str(SKEL))
+    # Scrub ambient PKOS_* rather than layering over it: the runbook tells the
+    # operator to export PKOS_ROOT and PKOS_DERIVED, and an inherited
+    # PKOS_DERIVED silently points every test store's derived plane at the real
+    # store's. dict(os.environ, ...) looks like it overrides both, and does -
+    # but any OTHER PKOS_ var the operator has set still rides along.
+    env = {k: v for k, v in os.environ.items() if not k.startswith("PKOS_")}
+    env.update(PKOS_ROOT=str(root), PKOS_DERIVED=str(Path(root) / "derived"),
+               PYTHONPATH=str(SKEL))
     return subprocess.run([sys.executable, "-m", "secondbrain"] + list(args),
                           cwd=str(SKEL), env=env, capture_output=True, text=True)
 

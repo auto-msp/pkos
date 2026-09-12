@@ -526,6 +526,12 @@ def cmd_servers(a):
     return 0
 
 
+def _top(d, n=4):
+    if not d:
+        return "(none)"
+    items = sorted(d.items(), key=lambda x: -x[1])[:n]
+    return ", ".join("%s=%d" % (k, v) for k, v in items)
+
 def cmd_secrets(a):
     from . import secrets as sec
     conn, p = _conn(a)
@@ -535,15 +541,35 @@ def cmd_secrets(a):
     for f in found:
         for k in f["kinds"]:
             payload["by_kind"][k] = payload["by_kind"].get(k, 0) + 1
+    if getattr(a, "sample", False):
+        payload["triage"] = sec.sample(conn)
     if a.redact:
-        n = sec.redact(conn, found)
-        payload["redacted"] = n
+        if not found:
+            payload["redacted"] = 0
+        else:
+            n = sec.redact(conn, found)
+            payload["redacted"] = n
     if _out(a, payload):
         return 0
     print("SECRET SCAN (SOW 28, 32)"); print("=" * 60)
     print("  objects with credential material : %d" % len(found))
     for k, v in sorted(payload["by_kind"].items(), key=lambda x: -x[1]):
         print("    %-14s %4d" % (k, v))
+    if getattr(a, "sample", False):
+        tri = payload["triage"]
+        for kind in sorted(tri["examples"], key=lambda k: -payload["by_kind"].get(k, 0)):
+            print("\n" + "-" * 60)
+            print("  %s  (%d objects)" % (kind, payload["by_kind"].get(kind, 0)))
+            print("  by object class : %s" % _top(tri["by_class"].get(kind, {})))
+            print("  by source       : %s" % _top(tri["by_source"].get(kind, {})))
+            print("  examples (match masked, shown in context):")
+            for e in tri["examples"][kind]:
+                print("    %s [%s]" % (e["object_id"], e["object_class"]))
+                print("      ...%s..." % e["context"][:150])
+        print("\n" + "-" * 60)
+        print("  Read these before redacting. A pattern like ?token= matches a")
+        print("  Drive share link exactly as happily as a live credential, and")
+        print("  redaction replaces the whole body with a marker (SOW 97).")
     if a.redact:
         print("\n  REDACTED %d object body/bodies." % payload["redacted"])
         print("  Raw bytes untouched in the evidence plane. Each redaction is a")
@@ -1033,6 +1059,10 @@ def build_parser():
     s = add("secrets", cmd_secrets, "scan canonical bodies for credential material (SOW 28)")
     s.add_argument("--redact", action="store_true",
                    help="replace offending bodies with a marker; evidence plane untouched")
+    s.add_argument("--sample", action="store_true",
+                   help="show WHAT matched, in context and masked, plus the "
+                        "distribution by object class and source. Run this "
+                        "before --redact: it is the SOW 97 impact report")
     add("export", cmd_export, "write the canonical JSONL mirror")
 
     s = add("ingest", cmd_ingest, "run a source adapter")
