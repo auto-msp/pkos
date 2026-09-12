@@ -5,6 +5,15 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 SKEL = HERE.parent
 
+# A suite that does an in-process `import secondbrain` (rather than only
+# shelling out through sb()) must not depend on the caller having exported
+# PYTHONPATH or on cwd happening to be the skeleton root. Setting it for
+# subprocesses alone is what made test_smoke and test_adapters_graph pass
+# on my machine and fail on Perceptor. Put SKEL on THIS process's path too,
+# at harness import, so every suite runs identically from any directory.
+if str(SKEL) not in sys.path:
+    sys.path.insert(0, str(SKEL))
+
 
 class Suite:
     def __init__(self, name):

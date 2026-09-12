@@ -5,6 +5,12 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 PKG = HERE.parent
+# _env() below pins PYTHONPATH for CHILD processes. This suite also does an
+# in-process `import secondbrain.evidence`, which that does nothing for, so
+# put PKG on this process's path as well - otherwise the suite passes only
+# when the caller already exported PYTHONPATH (bug 17, third occurrence).
+if str(PKG) not in sys.path:
+    sys.path.insert(0, str(PKG))
 FAILURES = []
 
 
