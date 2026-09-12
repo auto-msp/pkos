@@ -43,10 +43,44 @@ from .. import canonical, evidence, ids
 from ..util import now_iso
 
 WIKILINK = re.compile(r"(!?)\[\[([^\]\[|#^]+)(?:[#^][^\]\[|]*)?(?:\|([^\]\[]*))?\]\]")
+# Obsidian has a "Use [[Wikilinks]]" setting, and with it OFF - which is the
+# default for anyone who wants their vault to stay portable markdown - it
+# writes ordinary links instead: [Note](Note.md) and ![img](assets/img.png).
+# A vault authored that way is fully linked and shows ZERO wikilinks, so an
+# adapter that only reads [[...]] reports an unlinked vault and is believed.
+# 3,637 notes yielding 343 links was the tell.
+MDLINK = re.compile(
+    r'(!?)\[([^\]\[]*)\]\(\s*<?([^)\s>]+)>?(?:\s+"[^"]*")?\s*\)')
+EXTERNAL = re.compile(r"^(?:[a-z][a-z0-9+.-]*:|//|#)", re.I)
 TAG = re.compile(r"(?:(?<=\s)|^)#([A-Za-z][\w/-]*)")
+# `#ef4444` is a colour, not a tag - and every CSS hex colour begins with one
+# of a-f, so "must start with a letter" lets all of them through. The first
+# real vault ingest produced a tag list whose top entries were ef4444, f59e0b,
+# f8fafc, FFFFFF: the store had learned that Moiz's most important topic was
+# the colour of his buttons. Obsidian itself rejects an all-digit tag for the
+# same family of reason; this rejects the hex shapes too.
+HEX_COLOUR = re.compile(r"^(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{4}|[0-9a-fA-F]{6}"
+                        r"|[0-9a-fA-F]{8})$")
+# A tag also has to look like a word. Obsidian requires at least one
+# non-numeric character; single letters and pure punctuation are noise.
+TAG_MIN_LEN = 2
 FENCE = re.compile(r"```.*?```|~~~.*?~~~|`[^`\n]+`", re.S)
 FRONTMATTER = re.compile(r"\A---\r?\n(.*?)\r?\n---\r?\n?", re.S)
 DAILY = re.compile(r"^(\d{4})[-_.]?(\d{2})[-_.]?(\d{2})$")
+# The canonical record of a note is a function of TWO things: the bytes on
+# disk, and the parser that read them. Hashing only the bytes means a parser
+# fix can never reach a vault that has already been ingested - re-running
+# reports "unchanged" and the store keeps serving the old interpretation,
+# which after the hex-colour bug meant keeping a tag list that said the
+# vault's central topics were #ef4444 and #f8fafc. Bumping this forces exactly
+# one new version per NOTE (not per attachment, whose parsing has not changed)
+# with change_type=normalized, which is what SOW 9 asks for when the
+# interpretation changes rather than the source.
+#   1 - initial
+#   2 - markdown links read as links; hex colours are no longer tags;
+#       frontmatter keeps what parses instead of discarding the block
+PARSE_VERSION = 2
+
 NOTE_EXT = {".md", ".markdown"}
 CANVAS_EXT = {".canvas"}
 SKIP_DIRS = {".obsidian", ".trash", ".git", ".smart-env", ".space"}
@@ -63,7 +97,8 @@ class ObsidianAdapter(BaseAdapter):
         super().__init__(*a, **kw)
         self.identity = identity
         self.stats = {"notes": 0, "canvases": 0, "attachments": 0,
-                      "wikilinks_found": 0, "links_resolved": 0,
+                      "wikilinks_found": 0, "markdown_links_found": 0,
+                      "external_links": 0, "links_resolved": 0,
                       "links_to_missing_notes": 0, "ambiguous_links": 0,
                       "embeds": 0, "tags_found": 0, "distinct_tags": 0,
                       "daily_notes": 0, "frontmatter_parsed": 0,
@@ -167,7 +202,7 @@ class ObsidianAdapter(BaseAdapter):
         invented capability SOW 107 forbids -- so anything richer is preserved
         verbatim under _unparsed_frontmatter rather than half-parsed.
         """
-        out, key = {}, None
+        out, key, nested = {}, None, {}
         for line in raw.splitlines():
             if not line.strip() or line.lstrip().startswith("#"):
                 continue
@@ -180,7 +215,13 @@ class ObsidianAdapter(BaseAdapter):
                 out[key].append(_scalar(re.sub(r"^\s*-\s+", "", line)))
                 continue
             if line[0] in " \t":
-                raise ValueError("nested mapping not supported")
+                # A nested map or a block scalar. Raising here threw away the
+                # WHOLE frontmatter block - 166 of 1,198 notes in the real
+                # vault lost every field they had because one key happened to
+                # be nested. Keep what parsed, collect the rest verbatim.
+                if key is not None:
+                    nested.setdefault(key, []).append(line.strip())
+                continue
             if ":" not in line:
                 raise ValueError("line is neither key nor list item")
             k, _, v = line.partition(":")
@@ -190,8 +231,15 @@ class ObsidianAdapter(BaseAdapter):
                 out[key] = []
             elif v.startswith("[") and v.endswith("]"):
                 out[key] = [_scalar(x) for x in v[1:-1].split(",") if x.strip()]
+            elif v in ("|", ">", "|-", ">-", "|+", ">+"):
+                out[key] = []          # block scalar; body arrives indented
             else:
                 out[key] = _scalar(v)
+        for k, lines in nested.items():
+            if isinstance(out.get(k), list) and not out[k]:
+                out[k] = [re.sub(r"^-\s*", "", x) for x in lines]
+            else:
+                out["%s__raw" % k] = "\n".join(lines)
         return out
 
     # -- acquisition --------------------------------------------------------
@@ -229,7 +277,22 @@ class ObsidianAdapter(BaseAdapter):
                 self.stats["embeds"] += 1
             self._pending.append((native, t, "EMBEDS" if bang else "LINKS_TO"))
 
-        tags = sorted({t for t in TAG.findall(stripped)})
+        for bang, text, href in MDLINK.findall(stripped):
+            if EXTERNAL.match(href):
+                self.stats["external_links"] = self.stats.get("external_links", 0) + 1
+                continue
+            from urllib.parse import unquote
+            t = unquote(href.split("#")[0]).strip()
+            if not t:
+                continue
+            self.stats["markdown_links_found"] += 1
+            (embeds if bang else links).append({"target": t, "alias": text or None})
+            if bang:
+                self.stats["embeds"] += 1
+            self._pending.append((native, t, "EMBEDS" if bang else "LINKS_TO"))
+
+        tags = sorted({t for t in TAG.findall(stripped)
+                       if len(t) >= TAG_MIN_LEN and not HEX_COLOUR.match(t)})
         for t in tags:
             self._tags[t] = self._tags.get(t, 0) + 1
         self.stats["tags_found"] += len(tags)
@@ -268,7 +331,10 @@ class ObsidianAdapter(BaseAdapter):
                 title=None, when=None, memory_type=None):
         st = path.stat()
         title = str(title or path.stem)[:500]
-        content_hash = evidence.hash_bytes(("%s|%s" % (digest, title)).encode())
+        basis = "%s|%s" % (digest, title)
+        if cls == "Note":
+            basis += "|parse%d" % PARSE_VERSION
+        content_hash = evidence.hash_bytes(basis.encode())
         oid, outcome = canonical.ingest_item(
             self.conn, source_id=self.source_id, account_id=self._account,
             workspace_id=self._workspace, native_id=native, object_class=cls,

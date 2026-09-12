@@ -49,6 +49,16 @@ def make_vault(d):
     (v / "Ambiguous.md").write_text("# A\n[[PKOS]]\n", encoding="utf-8")
     (v / "projects" / "Ambiguous.md").write_text("# B\n", encoding="utf-8")
     (v / "Collide.md").write_text("Links to [[Ambiguous]].\n", encoding="utf-8")
+    # A vault with "Use [[Wikilinks]]" OFF writes portable markdown links.
+    # Obsidian supports both; an adapter that reads only [[...]] reports such
+    # a vault as unlinked and is believed, because nothing errors.
+    (v / "Portable.md").write_text(
+        "# Portable\n\nLinks to [Perceptor](Perceptor.md) and "
+        "[the build](projects/Second%20Brain.md).\n"
+        "Embeds ![diagram](diagram.png).\n"
+        "External [docs](https://example.com) is not a vault link.\n"
+        "Colours here are not tags: #ef4444 #f8fafc #FFFFFF\n",
+        encoding="utf-8")
     (v / "daily" / "2026-09-11.md").write_text(
         "# Today\n\nShipped part 2. [[PKOS]]\n", encoding="utf-8")
     (v / "diagram.png").write_bytes(b"\x89PNG\r\n\x1a\nfake")
@@ -103,8 +113,8 @@ def main():
     s.check("ingest completes", d and d["status"] == "COMPLETED",
             (r.stdout + r.stderr)[-400:] if not d else "")
     st = (d or {}).get("adapter_stats", {})
-    s.check("7 notes, 1 canvas, 1 attachment",
-            (st.get("notes"), st.get("canvases"), st.get("attachments")) == (7, 1, 1),
+    s.check("8 notes, 1 canvas, 1 attachment",
+            (st.get("notes"), st.get("canvases"), st.get("attachments")) == (8, 1, 1),
             "%s" % [st.get("notes"), st.get("canvases"), st.get("attachments")])
     s.check(".obsidian config directory not ingested as content",
             one(root, "SELECT COUNT(*) FROM source_object"
@@ -113,12 +123,18 @@ def main():
     s.check("wikilinks became real edges", st.get("links_resolved", 0) >= 4,
             "resolved=%s of %s found" % (st.get("links_resolved"),
                                          st.get("wikilinks_found")))
-    s.check("an attachment embed resolves to the FILE and is typed EMBEDS",
+    # BOTH embed syntaxes - ![[diagram.png]] and ![alt](diagram.png) - must
+    # land on the same attachment object. Two notes embed it, so two edges.
+    s.check("both embed syntaxes resolve to the same FILE, typed EMBEDS",
             one(root, "SELECT COUNT(*) FROM relationship r JOIN object o"
                       " ON o.object_id=r.target_object"
                       " WHERE r.relationship_type='EMBEDS'"
-                      " AND o.title='diagram'") == 1,
+                      " AND o.title='diagram'") == 2,
             "embeds found=%s" % st.get("embeds"))
+    s.check("and they came from two different notes",
+            one(root, "SELECT COUNT(DISTINCT r.source_object) FROM relationship r"
+                      " JOIN object o ON o.object_id=r.target_object"
+                      " WHERE r.relationship_type='EMBEDS' AND o.title='diagram'") == 2)
     s.check("a path-qualified link [[folder/Note]] resolves too",
             one(root, "SELECT COUNT(*) FROM relationship r"
                       " JOIN object src ON src.object_id=r.source_object"
@@ -157,6 +173,23 @@ def main():
                 root, "SELECT source_created_at FROM source_object"
                       " WHERE native_id='obsidian:daily/2026-09-11.md'") or ""
                 ).startswith("2026-09-11"))
+
+    print("\n  portable markdown links, hex colours, parser versioning")
+    s.check("markdown links were read as links",
+            st.get("markdown_links_found", 0) >= 3,
+            "got %s" % st.get("markdown_links_found"))
+    s.check("an external https link is not counted as a vault link",
+            st.get("external_links", 0) >= 1, "got %s" % st.get("external_links"))
+    pm = json.loads(one(root, "SELECT raw_metadata FROM source_object"
+                              " WHERE native_id='obsidian:Portable.md'"))
+    s.check("CSS hex colours are NOT tags",
+            not any(t.lower() in ("ef4444", "f8fafc", "ffffff") for t in pm["tags"]),
+            "tags=%s" % pm["tags"])
+    s.check("a markdown link resolved to a real edge",
+            one(root, "SELECT COUNT(*) FROM relationship r"
+                      " JOIN object src ON src.object_id=r.source_object"
+                      " JOIN object tgt ON tgt.object_id=r.target_object"
+                      " WHERE src.title='Portable' AND tgt.title='Perceptor'") == 1)
 
     d2, _ = ingest(root, "obsidian", v, "--identity", "automsp-vault")
     s.check("re-ingest of an unchanged vault creates nothing",
