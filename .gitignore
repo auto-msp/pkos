@@ -1,4 +1,4 @@
-﻿__pycache__/
+__pycache__/
 *.pyc
 02-canonical/
 95-transfer/
@@ -11,3 +11,16 @@ skeleton.tar.gz
 
 # raw server audits: root crontabs + systemd units carry live secrets
 90-evidence/servers/
+
+# credentials and key material must never be committed (public repo)
+.env
+.env.*
+*.pem
+*.ppk
+*.key
+id_rsa*
+id_ed25519*
+*.pfx
+*.p12
+credentials.json
+*service-account*.json

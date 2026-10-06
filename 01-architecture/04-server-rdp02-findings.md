@@ -299,7 +299,7 @@ Earlier hypothesis (that Cloudflare terminates TLS and certbot is decorative) is
 | Certificate | Expires | Days left |
 |---|---|---:|
 | `mailserver.automsp.link` | 2026-10-01 | **23** |
-| `n8n.automsp.us` | 2026-10-08 | 30 |
+| `n8n.coreitx.us.kg` | 2026-10-08 | 30 |
 | `nemoclaw.automsp.us` | 2026-10-15 | 37 |
 
 All currently VALID. But Let's Encrypt renews at **30 days remaining**, and `mailserver.automsp.link` is at 23 days and has not renewed — so this is not a theoretical risk. The renewal window has already been missed once, and `certbot.service` is in a `failed` state.
@@ -354,13 +354,13 @@ Failing twice daily since at least **Sep 5** (09:18, 16:54, Sep 6 01:52, 16:17, 
 
 ## What it is, narrowed by evidence
 
-Only `mailserver.automsp.link` fails. `n8n.automsp.us` and `nemoclaw.automsp.us` are not erroring — though neither has been *attempted* yet, since only the `.link` cert is inside the 30-day renewal window. So the evidence points at **`automsp.link` specifically**, not at a broken token:
+Only `mailserver.automsp.link` fails. `n8n.coreitx.us.kg` and `nemoclaw.automsp.us` are not erroring — though neither has been *attempted* yet, since only the `.link` cert is inside the 30-day renewal window. So the evidence points at **`automsp.link` specifically**, not at a broken token:
 
 1. **Token scope excludes the zone.** Most likely. A token scoped to `automsp.us` cannot read `automsp.link`. Requires `Zone:Read` on the zone plus `DNS:Edit` to write the challenge record.
 2. **`automsp.link` lives in a different Cloudflare account** from the one the token belongs to.
 3. **The zone was removed** from Cloudflare, or never fully added (pending nameserver delegation).
 
-`n8n.automsp.us` sits at exactly 30 days and will be attempted imminently — that attempt is a free test of whether the token covers `automsp.us`.
+`n8n.coreitx.us.kg` sits at exactly 30 days and will be attempted imminently — that attempt is a free test of whether the token covers `automsp.us`.
 
 ## Decisive test — reads the token, never prints it
 
@@ -404,10 +404,10 @@ The file is named `cloudflare-automsp-link.ini` but holds a token scoped to a *d
 | Certificate | Zone needed | Token sees it? | Expires |
 |---|---|---|---:|
 | `mailserver.automsp.link` | `automsp.link` | **no** | 2026-10-01 (23 d) |
-| `n8n.automsp.us` | `automsp.us` | **no** | 2026-10-08 (30 d) |
+| `n8n.coreitx.us.kg` | `automsp.us` | **no** | 2026-10-08 (30 d) |
 | `nemoclaw.automsp.us` | `automsp.us` | **no** | 2026-10-15 (37 d) |
 
-Only the `.link` cert has failed *so far* because it is the only one inside its 30-day renewal window. `n8n.automsp.us` sits at exactly 30 days and is due imminently — **expect it to fail next**, unless its renewal conf points at a different credentials file.
+Only the `.link` cert has failed *so far* because it is the only one inside its 30-day renewal window. `n8n.coreitx.us.kg` sits at exactly 30 days and is due imminently — **expect it to fail next**, unless its renewal conf points at a different credentials file.
 
 Check whether the `.us` certs use a different token:
 
