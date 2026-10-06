@@ -50,7 +50,7 @@ Six independent failures were found. Every one is a **stale or mislabelled piece
 Recorded because the method matters as much as the findings (§107):
 
 1. Claimed nothing was listening on `:80`/`:443` on rdp02 — **wrong**, the listening table had been truncated to 25 rows on read.
-2. Claimed certbot and Traefik shared the `:80` root cause — **wrong**; certbot uses DNS-01, which needs no port. (Partially right after all: `n8n.automsp.us` alone uses `webroot` and *is* affected.)
+2. Claimed certbot and Traefik shared the `:80` root cause — **wrong**; certbot uses DNS-01, which needs no port. (Partially right after all: `n8n.coreitx.us.kg` alone uses `webroot` and *is* affected.)
 3. Recommended "switch certbot to DNS-01" — **already configured**; the `dns-cloudflare` plugin was in use.
 4. Raised "vault backup is empty" as critical — **wrong**; the drill's check SSHes to rdp02 and `|| echo 0` swallows the failure. Local backups are healthy: five consecutive nightly tarballs, ~83.4 MB each.
 5. Read a jump-host probe as success — **wrong**; `head -1` had swallowed the `Permission denied` on line 2.

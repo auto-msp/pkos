@@ -67,7 +67,7 @@ class N8nAdapter(BaseAdapter):
         if not self.identity:
             raise SystemExit(
                 "n8n adapter requires --identity <instance host or name>, e.g. "
-                "n8n.automsp.us.\nThree n8n instances run on this fleet and "
+                "n8n.coreitx.us.kg.\nThree n8n instances run on this fleet and "
                 "their workflows overlap by name. SOW 45/46: identity is "
                 "explicit, never inferred -- otherwise two instances' copies of "
                 "'Lead Router' become one object and the store starts lying "

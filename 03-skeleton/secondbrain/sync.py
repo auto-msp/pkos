@@ -223,6 +223,15 @@ def import_bundle(paths, bundle_dir, local_conn=None, force=False):
     # evidence first: additive, content-addressed, safe to apply before the db
     with tarfile.open(b / BUNDLE_BLOBS, "r:gz") as t:
         members = [m for m in t.getmembers() if m.isfile()]
+        # Refuse a bundle whose members could be extracted outside the
+        # evidence directory (absolute path or ".." traversal).
+        unsafe = [m.name for m in members
+                  if Path(m.name).is_absolute() or ".." in Path(m.name).parts]
+        if unsafe:
+            rep["refusals"].append(
+                "bundle contains %d member(s) with unsafe paths (absolute or "
+                "'..'); refusing to extract" % len(unsafe))
+            return rep
         # A blob already present is NEVER overwritten. Blobs are content
         # addressed and stored read-only (mode 444) precisely so that they
         # cannot be rewritten - extracting over one fails with EACCES, and

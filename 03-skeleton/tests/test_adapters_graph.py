@@ -199,7 +199,7 @@ def main():
     # ---------------------------------------------------------------- n8n
     print("\nN8N WORKFLOWS")
     n = make_n8n(fx)
-    d, r = ingest(root, "n8n", n, "--identity", "n8n.automsp.us")
+    d, r = ingest(root, "n8n", n, "--identity", "n8n.coreitx.us.kg")
     s.check("ingest completes", d and d["status"] == "COMPLETED",
             (r.stdout + r.stderr)[-400:] if not d else "")
     st = (d or {}).get("adapter_stats", {})
@@ -242,7 +242,7 @@ def main():
     (bad / "credentials.json").write_text(json.dumps(
         [{"id": "7", "name": "Clay key", "type": "httpHeaderAuth",
           "encryptedData": "U2FsdGVkX1+abcdef=="}]), encoding="utf-8")
-    rc = sb(root, "ingest", "n8n", str(bad), "--identity", "n8n.automsp.us")
+    rc = sb(root, "ingest", "n8n", str(bad), "--identity", "n8n.coreitx.us.kg")
     blob = (rc.stdout + rc.stderr).lower()
     s.check("credentials file refused with the reason named",
             rc.returncode != 0 and "credential" in blob and "evidence plane" in blob,
